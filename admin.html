@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wasit | لوحة الإدارة</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--ink:#0b1b3a;--mut:#66738f;--line:#e1e7f0;--green:#12b76a;--red:#e5484d;--yellow:#f5a524;--navy:#0b1b3a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 Tahoma,Arial,sans-serif}
+button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
+.login{min-height:100vh;display:grid;place-items:center;padding:18px}.login .box{width:min(430px,100%);background:var(--card);padding:28px;border:1px solid var(--line);border-radius:22px;box-shadow:0 15px 50px #0b1b3a12}
+input,select,textarea{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);margin:5px 0 12px}
+label{font-size:13px;font-weight:bold}.btn{border:0;border-radius:10px;padding:10px 15px;background:var(--green);color:#04210f;font-weight:bold}.btn.secondary{background:#eef2f8;color:var(--ink)}.btn.danger{background:var(--red);color:#fff}.btn.small{padding:7px 10px;font-size:12px}
+.shell{display:grid;grid-template-columns:235px 1fr;min-height:100vh}.side{background:var(--navy);color:#fff;padding:20px;position:sticky;top:0;height:100vh}.brand{font-size:24px;font-weight:bold;margin-bottom:22px}.brand b{color:var(--green)}
+.nav button{width:100%;text-align:right;border:0;background:transparent;color:#cbd6ea;padding:11px;border-radius:10px;margin:3px 0}.nav button.active,.nav button:hover{background:#ffffff16;color:#fff}
+.content{padding:22px;max-width:1450px;width:100%;margin:auto}.top{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:18px}.top h1{margin:0;font-size:25px}
+.cards{display:grid;grid-template-columns:repeat(6,minmax(130px,1fr));gap:12px}.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}.stat b{font-size:27px;display:block}.mut{color:var(--mut);font-size:13px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:17px;margin-top:15px}.panel h2{margin:0 0 13px;font-size:19px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:780px}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}th{color:var(--mut);font-weight:normal}
+.badge{display:inline-block;padding:3px 9px;border-radius:99px;background:#e9f8f1;color:#087d49;font-size:12px}.badge.red{background:#fdecec;color:#b3262d}.badge.yellow{background:#fff5dc;color:#8b5d00}.badge.gray{background:#eef2f8;color:#52617c}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.toolbar input,.toolbar select{width:auto;min-width:160px;margin:0}
+.modal{position:fixed;inset:0;background:#0008;display:none;place-items:center;padding:15px;z-index:5}.modal.show{display:grid}.modalbox{background:#fff;border-radius:18px;width:min(650px,100%);max-height:90vh;overflow:auto;padding:20px}
+.alert{padding:10px 12px;border-radius:10px;background:#fff5dc;color:#765000;margin:10px 0}.error{color:#b3262d;background:#fdecec}.ok{color:#087d49;background:#e9f8f1}
+@media(max-width:900px){.shell{grid-template-columns:1fr}.side{height:auto;position:relative}.nav{display:flex;overflow:auto}.nav button{min-width:max-content}.cards{grid-template-columns:repeat(2,1fr)}.content{padding:14px}.top{align-items:flex-start}.top h1{font-size:21px}}
+</style>
+</head>
+<body>
+<div id="login" class="login">
+ <div class="box">
+  <h1>Wasit<span style="color:#12b76a">.</span></h1>
+  <p class="mut">تسجيل دخول الإدارة</p>
+  <div id="loginMsg"></div>
+  <label>البريد الإلكتروني</label><input id="email" type="email" autocomplete="username">
+  <label>كلمة المرور</label><input id="password" type="password" autocomplete="current-password">
+  <button class="btn" style="width:100%" onclick="login()">تسجيل الدخول</button>
+ </div>
+</div>
+
+<div id="app" class="shell hidden">
+<aside class="side">
+ <div class="brand">Wasit<b>.</b></div>
+ <div class="nav">
+  <button data-page="dashboard" onclick="page('dashboard')">📊 الرئيسية</button>
+  <button data-page="mediators" onclick="page('mediators')">👥 الوسطاء</button>
+  <button data-page="operations" onclick="page('operations')">🔄 العمليات</button>
+  <button data-page="disputes" onclick="page('disputes')">🚨 النزاعات</button>
+  <button data-page="audit" onclick="page('audit')">🧾 سجل التدقيق</button>
+ </div>
+ <button class="btn danger" style="margin-top:25px;width:100%" onclick="logout()">تسجيل الخروج</button>
+</aside>
+<main class="content">
+ <div class="top"><h1 id="title">الرئيسية</h1><span id="who" class="mut"></span></div>
+ <section id="view"></section>
+</main>
+</div>
+
+<div id="modal" class="modal"><div id="modalbox" class="modalbox"></div></div>
+
+<script>
+let csrf="", currentAdmin=null, opFilter="";
+const cache={m:{},o:{},d:{},ms:[]};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const labels={created:"تم الإنشاء",accepted:"مقبولة",payment_pending:"في انتظار الدفع",payment_confirmed:"تم تأكيد الدفع",in_progress:"قيد التنفيذ",client_confirmation:"تأكيد العميل",completed:"مكتملة",cancelled:"ملغاة",disputed:"نزاع",active:"نشط",inactive:"غير نشط",suspended:"موقوف",open:"مفتوح",under_review:"قيد المراجعة",resolved_client:"حُل للعميل",resolved_mediator:"حُل للوسيط",closed:"مغلق"};
+function badge(v){let c=["disputed","cancelled","suspended","open"].includes(v)?"red":["payment_pending","under_review"].includes(v)?"yellow":"gray";return `<span class="badge ${c}">${esc(labels[v]||v)}</span>`}
+async function api(url,opt={}){
+ opt.headers=Object.assign({"Content-Type":"application/json"},opt.headers||{});
+ if(!["GET","HEAD"].includes(opt.method||"GET")) opt.headers["X-CSRF-Token"]=csrf;
+ const r=await fetch(url,opt); let d={}; try{d=await r.json()}catch{}
+ if(r.status===401){showLogin();throw new Error(d.error||"انتهت الجلسة")}
+ if(!r.ok) throw new Error(d.error||"حدث خطأ");
+ return d;
+}
+async function init(){
+ try{const d=await fetch("/api/admin/me"); if(!d.ok) return showLogin(); const x=await d.json(); csrf=x.csrfToken;currentAdmin=x.admin;showApp();page("dashboard")}
+ catch(e){showLogin()}
+}
+function showLogin(){$("login").classList.remove("hidden");$("app").classList.add("hidden")}
+function showApp(){$("login").classList.add("hidden");$("app").classList.remove("hidden");$("who").textContent=currentAdmin?.email||""}
+async function login(){
+ const msg=$("loginMsg");msg.innerHTML="";
+ try{const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:$("email").value,password:$("password").value})});csrf=d.csrfToken;currentAdmin=d.admin;showApp();page("dashboard")}
+ catch(e){msg.innerHTML=`<div class="alert error">${esc(e.message)}</div>`}
+}
+async function logout(){try{await api("/api/admin/logout",{method:"POST"});}finally{csrf="";currentAdmin=null;showLogin()}}
+function page(p){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===p));$("title").textContent={dashboard:"الرئيسية",mediators:"إدارة الوسطاء",operations:"إدارة العمليات",disputes:"إدارة النزاعات",audit:"سجل التدقيق"}[p];({dashboard:dashboard,mediators:mediators,operations:operations,disputes:disputes,audit:audit}[p])()}
+function openModal(html){$("modalbox").innerHTML=html;$("modal").classList.add("show")}
+function closeModal(){$("modal").classList.remove("show")}
+$("modal").onclick=e=>{if(e.target.id==="modal")closeModal()}
+function errBox(e){return `<div class="alert error">${esc(e.message||e)}</div>`}
+
+async function dashboard(){
+ try{const d=await api("/api/admin/dashboard");$("view").innerHTML=`
+ <div class="cards">
+  ${[["الوسطاء",d.stats.mediators],["النشطون",d.stats.activeMediators],["العمليات",d.stats.operations],["نزاعات مفتوحة",d.stats.openDisputes],["مكتملة",d.stats.completed],["إجمالي القيمة",Number(d.stats.volume).toLocaleString("ar-EG")+" ج.م"]].map(x=>`<div class="stat"><b>${esc(x[1])}</b><span class="mut">${x[0]}</span></div>`).join("")}
+ </div>
+ <div class="panel"><h2>آخر العمليات</h2><div class="table-wrap"><table><thead><tr><th>الكود</th><th>العميل</th><th>الوسيط</th><th>القيمة</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>
+ ${d.recent.map(o=>`<tr><td>${esc(o.code)}</td><td>${esc(o.client_name||"-")}</td><td>${esc(o.mediator_name||"-")}</td><td>${Number(o.amount).toLocaleString("ar-EG")} ج.م</td><td>${badge(o.status)}</td><td>${esc(o.created_at)}</td></tr>`).join("")||"<tr><td colspan=6>لا توجد بيانات</td></tr>"}
+ </tbody></table></div></div>`}
+ catch(e){$("view").innerHTML=errBox(e)}
+}
+
+async function mediators(){
+ try{const rows=await api("/api/admin/mediators");cache.m={};rows.forEach(m=>cache.m[m.id]=m);$("view").innerHTML=`
+ <div class="toolbar"><input id="mq" placeholder="بحث بالاسم أو البريد أو الهاتف" oninput="clearTimeout(window._mt);window._mt=setTimeout(loadM,300)"><button class="btn" onclick="newMediator()">+ إضافة وسيط</button><button class="btn secondary" onclick="loadM()">تحديث</button></div>
+ <div class="panel"><div class="table-wrap"><table><thead><tr><th>الاسم</th><th>الحالة</th><th>التحقق</th><th>التقييم</th><th>عمليات</th><th>الرسوم</th><th></th></tr></thead><tbody id="mtbody">
+ ${rows.map(m=>`<tr><td><b>${esc(m.name)}</b><br><span class="mut">${esc(m.email||"")}</span></td><td>${badge(m.status)}</td><td>${badge(m.verification)}</td><td>⭐ ${Number(m.rating).toFixed(1)}</td><td>${m.completed_count}</td><td>${m.fee_percent==null?"—":m.fee_percent+"%"}</td><td><button class="btn small secondary" onclick="editMediator(${Number(m.id)})">تعديل</button> <button class="btn small danger" onclick="deactivateMediator(${Number(m.id)})">تعطيل</button></td></tr>`).join("")||"<tr><td colspan=7>لا توجد وسطاء</td></tr>"}
+ </tbody></table></div></div>`}
+ catch(e){$("view").innerHTML=errBox(e)}
+}
+async function loadM(){const q=$("mq")?.value||"";let rows;try{rows=await api("/api/admin/mediators?q="+encodeURIComponent(q))}catch(e){alert(e.message);return}cache.m={};rows.forEach(m=>cache.m[m.id]=m);$("mtbody").innerHTML=rows.map(m=>`<tr><td><b>${esc(m.name)}</b><br><span class="mut">${esc(m.email||"")}</span></td><td>${badge(m.status)}</td><td>${badge(m.verification)}</td><td>⭐ ${Number(m.rating).toFixed(1)}</td><td>${m.completed_count}</td><td>${m.fee_percent==null?"—":m.fee_percent+"%"}</td><td><button class="btn small secondary" onclick="editMediator(${Number(m.id)})">تعديل</button> <button class="btn small danger" onclick="deactivateMediator(${Number(m.id)})">تعطيل</button></td></tr>`).join("")}
+function mediatorForm(m={}){
+ openModal(`<h2>${m.id?"تعديل وسيط":"إضافة وسيط"}</h2>
+ <label>الاسم</label><input id="mn" value="${esc(m.name||"")}"><label>البريد</label><input id="me" value="${esc(m.email||"")}"><label>الهاتف</label><input id="mp" value="${esc(m.phone||"")}">
+ <label>الحالة</label><select id="ms">${["active","inactive","suspended"].map(x=>`<option ${m.status===x?"selected":""} value="${x}">${labels[x]}</option>`).join("")}</select>
+ <label>التحقق</label><select id="mv">${["unverified","identity","full"].map(x=>`<option ${m.verification===x?"selected":""} value="${x}">${x}</option>`).join("")}</select>
+ <label>التقييم</label><input id="mr" type="number" min="0" max="5" step=".1" value="${m.rating??0}"><label>عدد العمليات المكتملة</label><input id="mc" type="number" min="0" value="${m.completed_count??0}">
+ <label>نسبة الرسوم %</label><input id="mf" type="number" min="0" step=".01" value="${m.fee_percent??""}"><label>ملاحظات</label><textarea id="mnots" rows="3">${esc(m.notes||"")}</textarea>
+ <div class="toolbar"><button class="btn" onclick="saveMediator(${m.id||"null"})">حفظ</button><button class="btn secondary" onclick="closeModal()">إلغاء</button></div>`);
+}
+function newMediator(){mediatorForm({})}function editMediator(id){mediatorForm(cache.m[id]||{})}
+async function saveMediator(id){try{const body={name:$("mn").value,email:$("me").value,phone:$("mp").value,status:$("ms").value,verification:$("mv").value,rating:Number($("mr").value),completed_count:Number($("mc").value),fee_percent:$("mf").value,notes:$("mnots").value};await api(id?"/api/admin/mediators/"+id:"/api/admin/mediators",{method:id?"PATCH":"POST",body:JSON.stringify(body)});closeModal();mediators()}catch(e){$("modalbox").insertAdjacentHTML("afterbegin",errBox(e))}}
+async function deactivateMediator(id){if(!confirm("تعطيل هذا الوسيط؟"))return;try{await api("/api/admin/mediators/"+id,{method:"DELETE"});mediators()}catch(e){alert(e.message)}}
+
+async function operations(){
+ try{const rows=await api("/api/admin/operations"+(opFilter?"?status="+encodeURIComponent(opFilter):""));const ms=await api("/api/admin/mediators");cache.ms=ms;cache.o={};rows.forEach(o=>cache.o[o.id]=o);$("view").innerHTML=`
+ <div class="toolbar"><select id="os"><option value="">كل الحالات</option>${["created","accepted","payment_pending","payment_confirmed","in_progress","client_confirmation","completed","cancelled","disputed"].map(x=>`<option value="${x}" ${opFilter===x?"selected":""}>${labels[x]}</option>`).join("")}</select><button class="btn" onclick="newOperation()">+ إضافة عملية</button><button class="btn secondary" onclick="operations()">تحديث</button></div>
+ <div class="panel"><div class="table-wrap"><table><thead><tr><th>الكود</th><th>العميل</th><th>الوسيط</th><th>القيمة</th><th>الحالة</th><th>التاريخ</th><th></th></tr></thead><tbody>
+ ${rows.map(o=>`<tr><td>${esc(o.code)}</td><td>${esc(o.client_name||"-")}</td><td>${esc(o.mediator_name||"-")}</td><td>${Number(o.amount).toLocaleString("ar-EG")} ج.م</td><td>${badge(o.status)}</td><td>${esc(o.created_at)}</td><td><button class="btn small secondary" onclick="editOperation(${Number(o.id)})">تعديل</button></td></tr>`).join("")||"<tr><td colspan=7>لا توجد عمليات</td></tr>"}
+ </tbody></table></div></div>`;$("os").onchange=()=>{opFilter=$("os").value;operations()}}
+ catch(e){$("view").innerHTML=errBox(e)}
+}
+function operationForm(o={},ms=[]){openModal(`<h2>${o.id?"تعديل عملية":"إضافة عملية"}</h2><label>اسم العميل</label><input id="oc" value="${esc(o.client_name||"")}"><label>بريد العميل</label><input id="oe" value="${esc(o.client_email||"")}"><label>الوسيط</label><select id="om"><option value="">بدون وسيط</option>${ms.map(m=>`<option value="${m.id}" ${Number(o.mediator_id)===Number(m.id)?"selected":""}>${esc(m.name)}</option>`).join("")}</select><label>القيمة</label><input id="oa" type="number" min="0" value="${o.amount??0}"><label>التصنيف</label><input id="ocat" value="${esc(o.category||"service")}"><label>وسيلة الدفع</label><input id="opay" value="${esc(o.payment_method||"")}"><label>الحالة</label><select id="ost">${["created","accepted","payment_pending","payment_confirmed","in_progress","client_confirmation","completed","cancelled","disputed"].map(x=>`<option value="${x}" ${o.status===x?"selected":""}>${labels[x]}</option>`).join("")}</select><label>الوصف</label><textarea id="od" rows="3">${esc(o.description||"")}</textarea><div class="toolbar"><button class="btn" onclick="saveOperation(${o.id||"null"})">حفظ</button><button class="btn secondary" onclick="closeModal()">إلغاء</button></div>`)}
+function newOperation(){operationForm({},cache.ms)}function editOperation(id){operationForm(cache.o[id]||{},cache.ms)}
+async function saveOperation(id){try{const body={client_name:$("oc").value,client_email:$("oe").value,mediator_id:$("om").value||null,amount:Number($("oa").value),category:$("ocat").value,payment_method:$("opay").value,status:$("ost").value,description:$("od").value};await api(id?"/api/admin/operations/"+id:"/api/admin/operations",{method:id?"PATCH":"POST",body:JSON.stringify(body)});closeModal();operations()}catch(e){$("modalbox").insertAdjacentHTML("afterbegin",errBox(e))}}
+
+async function disputes(){
+ try{const rows=await api("/api/admin/disputes");cache.d={};rows.forEach(d=>cache.d[d.id]=d);$("view").innerHTML=`<div class="panel"><h2>النزاعات</h2><div class="table-wrap"><table><thead><tr><th>رقم النزاع</th><th>العملية</th><th>العميل</th><th>الوسيط</th><th>السبب</th><th>الحالة</th><th></th></tr></thead><tbody>${rows.map(d=>`<tr><td>#${d.id}</td><td>${esc(d.code)}</td><td>${esc(d.client_name||"-")}</td><td>${esc(d.mediator_name||"-")}</td><td>${esc(d.reason)}</td><td>${badge(d.status)}</td><td><button class="btn small secondary" onclick="editDispute(${Number(d.id)})">مراجعة</button></td></tr>`).join("")||"<tr><td colspan=7>لا توجد نزاعات</td></tr>"}</tbody></table></div></div>`}
+ catch(e){$("view").innerHTML=errBox(e)}
+}
+function editDispute(id){const d=cache.d[id];if(!d)return;openModal(`<h2>مراجعة النزاع #${d.id}</h2><p><b>العملية:</b> ${esc(d.code)}<br><b>السبب:</b> ${esc(d.reason)}<br><b>التفاصيل:</b> ${esc(d.details||"-")}</p><label>الحالة</label><select id="ds">${["open","under_review","resolved_client","resolved_mediator","closed"].map(x=>`<option value="${x}" ${d.status===x?"selected":""}>${labels[x]}</option>`).join("")}</select><label>ملاحظة القرار</label><textarea id="dn" rows="4">${esc(d.resolution_note||"")}</textarea><div class="toolbar"><button class="btn" onclick="saveDispute(${d.id})">حفظ القرار</button><button class="btn secondary" onclick="closeModal()">إلغاء</button></div>`)}
+async function saveDispute(id){try{await api("/api/admin/disputes/"+id,{method:"PATCH",body:JSON.stringify({status:$("ds").value,resolution_note:$("dn").value})});closeModal();disputes()}catch(e){$("modalbox").insertAdjacentHTML("afterbegin",errBox(e))}}
+
+async function audit(){try{const rows=await api("/api/admin/audit");$("view").innerHTML=`<div class="panel"><h2>آخر 100 إجراء إداري</h2><div class="table-wrap"><table><thead><tr><th>الوقت</th><th>الأدمن</th><th>الإجراء</th><th>النوع</th><th>المعرف</th><th>IP</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.created_at)}</td><td>${esc(x.admin_email||"-")}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type||"-")}</td><td>${esc(x.entity_id||"-")}</td><td dir="ltr">${esc(x.ip||"-")}</td></tr>`).join("")}</tbody></table></div></div>`}catch(e){$("view").innerHTML=errBox(e)}}
+init();
+</script>
+</body></html>
